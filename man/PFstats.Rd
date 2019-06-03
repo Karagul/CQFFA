@@ -17,3 +17,8 @@ a list with a data.frame PF.return.result.table that includes all statistics, as
 \description{
 This function creates all important descriptive statistics such as VaR, ES, Return for a portfolio
 }
+\examples{
+weights.vector          <- c(0.7,0.3)
+daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
+PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
+}
