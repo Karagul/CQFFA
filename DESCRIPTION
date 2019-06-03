@@ -1,14 +1,13 @@
 Package: CQFFA
-Type: Package
 Title: Package with all functions used for the CQF Final Project
-Version: 1.0.0
-Author: Fabian Arter
+Version: 0.1
+Author: Fabian Arter <fabian.arter@gmail.com>
 Maintainer: Fabian Arter <fabian.arter@gmail.com>
 Description: Load and transformation functions of financial data as well as several Portfolio Optimization methods
+Depends: R (>= 3.1.0)
 License: GPL-2
-Encoding: UTF-8
 LazyData: true
-Imports: 
+Suggests: 
          BatchGetSymbols, 
          ggplot2, 
          GGally,
