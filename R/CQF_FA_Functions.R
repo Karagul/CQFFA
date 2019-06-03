@@ -123,3 +123,170 @@ PFstats <- function(weights.vector, daily.returns.data.wide) {
 
 
 
+#########################################################################
+# PORTFOLIO OPTIMIZATIONS #
+#########################################################################
+
+#' meanVariancePortfolioOptimizer
+#'
+#' @description This function creates all important descriptive statistics such as VaR, ES, Return for a portfolio
+#' @param mu.vector vector with estimated returns of investment objects
+#' @param sigma.vector vector with the volatilities of the investment objects
+#' @param correl.matrix correlation matrix of the investment objects
+#' @param target.return which return level is seeked (for which the variance is minimized)
+#' @param rf risk free return
+#' @return weight.risky.assets a vector with the weights of the risky assets
+#' @examples
+#' weights.vector          <- c(0.7,0.3)
+#' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
+#' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
+#' @export
+meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf,print.out=FALSE) {
+
+  one.vector <- rep(1,length(mu.vector))
+  S          <- diag(sigma.vector)
+  R          <- correl.matrix
+  SRS        <- S %*% R %*% S
+
+  if(rf!=0) {
+    optimal.weights = ((target.return-rf) * solve(SRS) %*% t(mu.vector-rf%*% one.vector)) /
+      as.numeric(((mu.vector-rf%*%one.vector) %*% solve(SRS) %*% t(mu.vector-rf %*% one.vector)))
+    optimal.weights.df <- data.frame(asset=1:length(mu.vector), optimal.weight=optimal.weights)
+    if(print.out==TRUE) {print(optimal.weights.df)}
+  } else {
+    A = as.numeric(t(one.vector) %*% solve(SRS) %*% one.vector)
+    B = as.numeric(t(mu.vector) %*% solve(SRS) %*% one.vector)
+    C = as.numeric(t(mu.vector) %*% solve(SRS) %*% mu.vector)
+
+    lambda = (A*target.return-B)/(A*C-B^2)
+    gamma  = (C-B*target.return)/(A*C-B^2)
+
+    optimal.weights <- solve(SRS) %*% (lambda * mu.vector + gamma * one.vector)
+    optimal.weights.df <- data.frame(asset=length(mu.vector), optimal.weight=optimal.weights)
+    if(print.out==TRUE) { print(optimal.weights.df) }
+  }
+
+
+  weight.risky.assets <- sum(optimal.weights)
+  if(print.out==TRUE) {print(paste("Total Weight Risky Assets:",round(weight.risky.assets,4)))}
+
+  if(rf!=0) {
+    if(print.out==TRUE) {  print(paste("Weight Risk-Free Asset:",round(1-weight.risky.assets,4)))}
+    pf.return <- t(optimal.weights) %*% mu.vector + (1-weight.risky.assets)*rf
+  } else {
+
+    pf.return <- t(optimal.weights) %*% mu.vector
+  }
+
+  if(print.out==TRUE) {print(paste("PF return:", round(pf.return,4)))}
+  pf.vola <- as.numeric(sqrt(t(c(optimal.weights)) %*% SRS %*% c(optimal.weights)))
+  if(print.out==TRUE) {print(paste("PF vola:", round(pf.vola,4)))}
+
+
+
+  result.table <- data.frame(asset.name      = c("risk free",asset.name),
+                             optimal.weights = c(round(1-weight.risky.assets,4), optimal.weights),
+                             pf.return       = pf.return,
+                             pf.vola         = pf.vola,
+                             rf.free         = rf)
+
+  result.table
+  return(result.table = result.table )
+}
+
+
+
+
+#' histCVaRcalc
+#'
+#' @description calculates the historical Conditional VaR / Expected Shortfall of a portfolio or an asset
+#' @param daily.returns Daily historical returns of a portfolio or single asset
+#' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
+#' @return cvar CVaR of the specific portfolio or asset with the set alpha
+#' @export
+histCVaRcalc = function(daily.returns, alpha){
+
+  i.num = alpha * length(portfolio.returns)
+
+  portfolio.returns <- sort(portfolio.returns)
+
+  cvar = mean(portfolio.returns[1:i.num])
+
+  return(cvar)
+}
+
+
+
+
+#Conditional VaR / Expected Shortfall Using Historical Returns
+histCVaRcalc = function(asset.weights, daily.returns, alpha){
+
+  portfolio.returns = sort(daily.returns %*% asset.weights)
+
+  i = alpha * length(portfolio.returns)
+
+  cvar = mean(portfolio.returns[1:i])
+
+  return(-cvar)
+}
+
+
+
+# asset.name list of asset names
+# mu.vector vector with estimated returns of investment objects
+# sigma.vector vector with the volatilities of the investment objects
+# correl.matrix correlation matrix of the investment objects
+# conf.level for the Conditional VaR - CVaR or Expected Loss ES
+CVaRPortfolioOptimizer <- function(asset.names, daily.returns, alpha) {
+
+  asset.weights <- rep(1/length(asset.names), length(asset.names))
+
+  #linear equality constraint
+  #note: nloptr requires all functions to have the same signature
+  eval_g0 <- function(asset.weights, daily.returns=NA, alpha=NA) {
+    return( sum(asset.weights) - 1 )
+  }
+
+  #numerical approximation of the gradient
+  des = function(asset.weights, daily.returns=NA, alpha=NA){
+    n = length(asset.weights)
+    out = asset.weights;
+    for (i in 0:n){
+      up = asset.weights;
+      dn = asset.weights;
+      up[i] = up[i]+.0001
+      dn[i] = dn[i]-.0001
+      out[i] = (histCVaRcalc(up,daily.returns=daily.returns,alpha=alpha) - histCVaRcalc(dn,daily.returns=daily.returns,alpha=alpha))/.0002
+    }
+    return(out)
+  }
+
+  #use nloptr to check out gradient
+  #check.derivatives(w,es,des,sim=sim, alpha=.05)
+
+  #function to optimize ??? a list of objective and gradient
+  toOpt = function(asset.weights, daily.returns=NA, alpha=NA){
+    list(objective=histCVaRcalc(asset.weights, daily.returns,alpha), gradient=des(asset.weights, daily.returns,alpha=alpha))
+  }
+
+  #equality constraint function.  The jacobian is 1 for all variables
+  eqCon = function(asset.weights,daily.returns=NA,alpha=NA){
+    list(constraints=eval_g0(asset.weights,daily.returns=NA,alpha=alpha),jacobian=rep(1,length(asset.weights)))
+  }
+  #optimization options
+  opts <- list( "algorithm" = "NLOPT_LD_SLSQP",
+                "xtol_rel" = 1.0e-7,
+                "maxeval" = 10000)
+  #run optimization and print results
+  nl = nloptr(asset.weights,toOpt,
+              lb = rep(0,length(asset.weights)),
+              ub = rep(1,length(asset.weights)),
+              eval_g_eq=eqCon,
+              opts=opts,
+              daily.returns=daily.returns,alpha=alpha)
+
+  s = nl$solution
+  obj = nl$objective
+
+  return(s)
+}
