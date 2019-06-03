@@ -12,8 +12,6 @@
 #' @param end.date  End Date of the historical price data
 #' @param input.tickers.df Data Frame with the products we wish to have the prices, this includes the ticker symbol and a friendly name
 #' @return a list with two data frames: cumulated.returns.data.long and cumulated.returns.data.long
-#' @examples
-#' etlFinData()
 #' @export
 etlFinData <- function(start.date=as.Date("2019-01-01"),
                        end.date=as.Date("2019-05-27"),
@@ -67,10 +65,6 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 #' @param weights.vector vector that contains the relative weights of the individual assets of the portfolio
 #' @param daily.returns.data.wide  data.frame including the daily returns of the specific assets as well as a reference date
 #' @return a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix
-#' @examples
-#' weights.vector          <- c(0.7,0.3)
-#' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
-#' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
 
 PFstats <- function(weights.vector, daily.returns.data.wide) {
