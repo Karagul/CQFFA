@@ -63,6 +63,11 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 #' @param weights.vector vector that contains the relative weights of the individual assets of the portfolio
 #' @param daily.returns.data.wide  data.frame including the daily returns of the specific assets as well as a reference date
 #' @return a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix
+#' @examples
+#' weights.vector          <- c(0.7,0.3)
+#' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
+#' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
+#' @export
 PFstats <- function(weights.vector, daily.returns.data.wide) {
 
 
@@ -103,12 +108,11 @@ PFstats <- function(weights.vector, daily.returns.data.wide) {
 
 
   #### CORREL MATRIX
-  #hist.return.df.long <- na.omit(data.frame(log.return=hist.daily.market.data$ret.closing.prices, asset=hist.daily.market.data$ticker))
-  return.matrix       <- data.matrix(daily.return.table[2:ncol(daily.return.table)], rownames.force=TRUE)
+  return.matrix       <- data.matrix(daily.returns.data.wide[2:ncol(daily.returns.data.wide)], rownames.force=TRUE)
   cor.mat             <- cor(return.matrix)
 
   plot.correl.matrix <- GGally::ggcorr(return.matrix,  palette='RdGy',digits=3, label=TRUE, label_round = 2, label_size=3, size = 2.2)
-  plot.correl.matrix <- plot.correl.matrix + labs(title = "Correlation Matrix", subtitle = paste(min(daily.return.table$ref.date), " - ", max(daily.return.table$ref.date)))
+  plot.correl.matrix <- plot.correl.matrix + labs(title = "Correlation Matrix", subtitle = paste(min(daily.returns.data.wide$ref.date), " - ", max(daily.returns.data.wide$ref.date)))
 
 
 
