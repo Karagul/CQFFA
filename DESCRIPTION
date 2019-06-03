@@ -7,10 +7,4 @@ Description: Load and transformation functions of financial data as well as seve
 Depends: R (>= 3.1.0)
 License: GPL-2
 LazyData: true
-Suggests: 
-         BatchGetSymbols, 
-         ggplot2, 
-         GGally,
-         reshape2
-         
-RoxygenNote: 6.1.1
+

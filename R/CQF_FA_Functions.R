@@ -7,12 +7,10 @@
 
 #' etlFinData
 #'
-#' @description This function loads historical price data from Yahoo finance and transforms the data in a long and wide table with daily returns
 #' @param start.date Start Date of the historical price data
 #' @param end.date  End Date of the historical price data
 #' @param input.tickers.df Data Frame with the products we wish to have the prices, this includes the ticker symbol and a friendly name
 #' @return a list with two data frames: cumulated.returns.data.long and cumulated.returns.data.long
-#' @export
 etlFinData <- function(start.date=as.Date("2019-01-01"),
                        end.date=as.Date("2019-05-27"),
                        input.tickers.df = data.frame(ticker=c("BA","AIR.PA"),
@@ -65,8 +63,6 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 #' @param weights.vector vector that contains the relative weights of the individual assets of the portfolio
 #' @param daily.returns.data.wide  data.frame including the daily returns of the specific assets as well as a reference date
 #' @return a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix
-#' @export
-
 PFstats <- function(weights.vector, daily.returns.data.wide) {
 
 
@@ -122,4 +118,4 @@ PFstats <- function(weights.vector, daily.returns.data.wide) {
 }
 
 
-###############################################################
+
