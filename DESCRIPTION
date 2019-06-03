@@ -12,6 +12,6 @@ Imports:
          BatchGetSymbols, 
          ggplot2, 
          GGally,
-         reshape2,
-         tikzDevice
+         reshape2
+         
 RoxygenNote: 6.1.1
