@@ -20,8 +20,5 @@ etlFinData(start.date = as.Date("2019-01-01"),
 a list with two data frames: cumulated.returns.data.long and cumulated.returns.data.long
 }
 \description{
-This function loads historical price data from Yahoo finance and transforms the data in a long and wide table with daily returns
-}
-\examples{
-etlFinData()
+etlFinData
 }
