@@ -19,7 +19,7 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 ) {
 
   # load data via BatchGetSymbols
-  daily.market.data <- BatchGetSymbols::BatchGetSymbols(
+  daily.returns.data.long <- BatchGetSymbols::BatchGetSymbols(
     tickers      = as.character(input.tickers.df$ticker),
     first.date   = start.date,
     last.date    = end.date,
@@ -29,29 +29,30 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 
 
   # add friendly names
-  daily.market.data <-  merge(daily.market.data, input.tickers.df, by="ticker")
+  daily.returns.data.long <-  merge(daily.returns.data.long, input.tickers.df, by="ticker")
 
-  daily.market.data[is.na(daily.market.data$ret.adjusted.prices),]$ret.adjusted.prices <- 0
-  daily.market.data <- na.omit(daily.market.data)
+  daily.returns.data.long[is.na(daily.returns.data.long$ret.adjusted.prices),]$ret.adjusted.prices <- 0
+  daily.returns.data.long <- na.omit(daily.returns.data.long)
 
-  daily.market.data <- data.frame(ref.date             = daily.market.data$ref.date,
-                                  friendly.name   = as.character(daily.market.data$friendly.name),
-                                  price.adjusted  = daily.market.data$price.adjusted,
-                                  daily.return    = daily.market.data$ret.adjusted.prices)
+  daily.returns.data.long <- data.frame(ref.date        = daily.returns.data.long$ref.date,
+                                        friendly.name   = as.character(daily.returns.data.long$friendly.name),
+                                        price.adjusted  = daily.returns.data.long$price.adjusted,
+                                        daily.return    = daily.returns.data.long$ret.adjusted.prices)
 
-  daily.returns.data.wide <- reshape2::dcast(daily.market.data,  ref.date ~ friendly.name, value.var = "daily.return")
+  daily.returns.data.wide <- reshape2::dcast(daily.returns.data.long,  ref.date ~ friendly.name, value.var = "daily.return")
   daily.returns.data.wide <- na.omit(daily.returns.data.wide)
 
   # cumulated returns wide
   cumulated.returns.data.wide  <- as.data.frame(cbind(ref.date = daily.returns.data.wide$ref.date, apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, cumsum)))
 
   # cumulated returns long
-  cumulated.returns.data.long          <- reshape2::melt(cumulated.returns.data.wide, id.vars=1, measure.vars = 2:ncol(cumulated.returns.data.wide))
-  cumulated.returns.data.long$ref.date <- as.Date(cumulated.returns.data.long$ref.date, origin = "1970-01-01")
-  cumulated.returns.data.long$name <- as.character(cumulated.returns.data.long$variable) ; cumulated.returns.data.long$variable <- NULL
+  cumulated.returns.data.long               <- reshape2::melt(cumulated.returns.data.wide, id.vars=1, measure.vars = 2:ncol(cumulated.returns.data.wide))
+  cumulated.returns.data.long$ref.date      <- as.Date(cumulated.returns.data.long$ref.date, origin = "1970-01-01")
+  cumulated.returns.data.long$name          <- as.character(cumulated.returns.data.long$variable) ; cumulated.returns.data.long$variable <- NULL
   cumulated.returns.data.long$cumul.return  <- cumulated.returns.data.long$value ; cumulated.returns.data.long$value <- NULL
 
-  return(list(daily.returns.data.wide     = daily.returns.data.wide,
+  return(list(daily.returns.data.long     = daily.returns.data.long,
+              daily.returns.data.wide     = daily.returns.data.wide,
               cumulated.returns.data.long = cumulated.returns.data.long))
 
 }
