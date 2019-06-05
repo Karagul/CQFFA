@@ -64,14 +64,16 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 #' @description This function creates all important descriptive statistics such as VaR, ES, Return for a portfolio
 #' @param weights.vector vector that contains the relative weights of the individual assets of the portfolio
 #' @param daily.returns.data.wide  data.frame including the daily returns of the specific assets as well as a reference date
+#' @param num.trade.days.per.year Number of trading days per year, default set to 250
 #' @return a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix
 #' @examples
 #' weights.vector          <- c(0.7,0.3)
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-PFstats <- function(weights.vector, daily.returns.data.wide) {
+PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.year=250) {
 
+  daily.returns.data.wide <- daily.returns.data.wide[order(daily.returns.data.wide$ref.date),]
 
   PF.daily.return <- rep(NA,nrow(daily.returns.data.wide))
 
@@ -89,13 +91,13 @@ PFstats <- function(weights.vector, daily.returns.data.wide) {
                                        PF.min.start.to.date.return   = min(PF.cumul.return.start.to.date),
                                        PF.min.daily.return  = min(PF.daily.return),
                                        PF.mean.daily.return = mean(PF.daily.return),
-                                       PF.annualized.return = mean(PF.daily.return)*250,
+                                       PF.annualized.return = mean(PF.daily.return)*num.trade.days.per.year,
                                        PF.sd.daily.return   = sd(PF.daily.return), # same as as.numeric(sqrt(t(weights.vector) %*% covar.matrix %*% weights.vector))
-                                       PF.annualized.vola   = sd(PF.daily.return)*sqrt(250),
+                                       PF.annualized.vola   = sd(PF.daily.return)*sqrt(num.trade.days.per.year),
                                        PF.hist.1dVaR95 = as.numeric(quantile(PF.daily.return,0.05)),
                                        PF.hist.1dES95  = mean(head(sort(PF.daily.return),n=floor(0.05*length(PF.daily.return)))),
-                                       PF.sharpe.ratio = (mean(PF.daily.return) / sd(PF.daily.return))*sqrt(250),
-                                       PF.sortino.ratio = (mean(PF.daily.return) / sd(PF.daily.return[PF.daily.return<0]))*sqrt(250)
+                                       PF.sharpe.ratio = (mean(PF.daily.return) / sd(PF.daily.return))*sqrt(num.trade.days.per.year),
+                                       PF.sortino.ratio = (mean(PF.daily.return) / sd(PF.daily.return[PF.daily.return<0]))*sqrt(num.trade.days.per.year)
   )
 
 
