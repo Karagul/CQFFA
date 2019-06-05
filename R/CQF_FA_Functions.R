@@ -11,6 +11,7 @@
 #' @param end.date  End Date of the historical price data
 #' @param input.tickers.df Data Frame with the products we wish to have the prices, this includes the ticker symbol and a friendly name
 #' @return a list with two data frames: cumulated.returns.data.long and cumulated.returns.data.long
+#' @export
 etlFinData <- function(start.date=as.Date("2019-01-01"),
                        end.date=as.Date("2019-05-27"),
                        input.tickers.df = data.frame(ticker=c("BA","AIR.PA"),
@@ -218,37 +219,26 @@ histCVaRcalc = function(daily.returns, alpha){
 
 
 
-#Conditional VaR / Expected Shortfall Using Historical Returns
-histCVaRcalc = function(asset.weights, daily.returns, alpha){
-
-  portfolio.returns = sort(daily.returns %*% asset.weights)
-
-  i = alpha * length(portfolio.returns)
-
-  cvar = mean(portfolio.returns[1:i])
-
-  return(-cvar)
-}
-
-
-
-# asset.name list of asset names
-# mu.vector vector with estimated returns of investment objects
-# sigma.vector vector with the volatilities of the investment objects
-# correl.matrix correlation matrix of the investment objects
-# conf.level for the Conditional VaR - CVaR or Expected Loss ES
-CVaRPortfolioOptimizer <- function(asset.names, daily.returns, alpha) {
+#' CVaRPortfolioOptimizer
+#'
+#' @description CVaR Portfolio Optimizer
+#' @param asset.names Vector with names of the single assets in the portfolio to be optimized
+#' @param daily.returns.data.wide data.frame including the daily returns of the specific assets as well as a reference date
+#' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
+#' @return cvar CVaR of the specific portfolio or asset with the set alpha
+#' @export
+CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) {
 
   asset.weights <- rep(1/length(asset.names), length(asset.names))
 
   #linear equality constraint
   #note: nloptr requires all functions to have the same signature
-  eval_g0 <- function(asset.weights, daily.returns=NA, alpha=NA) {
+  eval_g0 <- function(asset.weights, ddaily.returns.data.wide=NA, alpha=NA) {
     return( sum(asset.weights) - 1 )
   }
 
   #numerical approximation of the gradient
-  des = function(asset.weights, daily.returns=NA, alpha=NA){
+  des = function(asset.weights, daily.returns.data.wide=NA, alpha=NA){
     n = length(asset.weights)
     out = asset.weights;
     for (i in 0:n){
@@ -256,7 +246,7 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns, alpha) {
       dn = asset.weights;
       up[i] = up[i]+.0001
       dn[i] = dn[i]-.0001
-      out[i] = (histCVaRcalc(up,daily.returns=daily.returns,alpha=alpha) - histCVaRcalc(dn,daily.returns=daily.returns,alpha=alpha))/.0002
+      out[i] = (histCVaRcalc(up,daily.returns.data.wide=daily.returns.data.wide,alpha=alpha) - histCVaRcalc(dn,daily.returns.data.wide=daily.returns.data.wide,alpha=alpha))/.0002
     }
     return(out)
   }
@@ -265,13 +255,13 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns, alpha) {
   #check.derivatives(w,es,des,sim=sim, alpha=.05)
 
   #function to optimize ??? a list of objective and gradient
-  toOpt = function(asset.weights, daily.returns=NA, alpha=NA){
-    list(objective=histCVaRcalc(asset.weights, daily.returns,alpha), gradient=des(asset.weights, daily.returns,alpha=alpha))
+  toOpt = function(asset.weights, daily.returns.data.wide=NA, alpha=NA){
+    list(objective=histCVaRcalc(asset.weights, daily.returns.data.wide,alpha), gradient=des(asset.weights, daily.returns.data.wide,alpha=alpha))
   }
 
   #equality constraint function.  The jacobian is 1 for all variables
-  eqCon = function(asset.weights,daily.returns=NA,alpha=NA){
-    list(constraints=eval_g0(asset.weights,daily.returns=NA,alpha=alpha),jacobian=rep(1,length(asset.weights)))
+  eqCon = function(asset.weights,daily.returns.data.wide=NA,alpha=NA){
+    list(constraints=eval_g0(asset.weights,daily.returns.data.wide=NA,alpha=alpha),jacobian=rep(1,length(asset.weights)))
   }
   #optimization options
   opts <- list( "algorithm" = "NLOPT_LD_SLSQP",
@@ -283,10 +273,16 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns, alpha) {
               ub = rep(1,length(asset.weights)),
               eval_g_eq=eqCon,
               opts=opts,
-              daily.returns=daily.returns,alpha=alpha)
+              daily.returns.data.wide=daily.returns.data.wide,alpha=alpha)
 
   s = nl$solution
   obj = nl$objective
 
   return(s)
 }
+
+
+
+
+
+
