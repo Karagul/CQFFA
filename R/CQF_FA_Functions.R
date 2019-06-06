@@ -57,6 +57,37 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 
 }
 
+#' SingleTitlestats
+#'
+#' @description This function creates Single Title stats
+#' @param daily.returns.data.wide  data.frame including the daily returns of the specific assets as well as a reference date
+#' @param num.trade.days.per.year Number of trading days per year, default set to 250
+#' @return a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix
+#' @export
+SingleTitlestats <- function(daily.returns.data.wide, num.trade.days.per.year=250) {
+
+  single.title.stats <-    data.frame(mean.return   = colMeans(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)]*num.trade.days.per.year),
+                                      sd            = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd)
+                                      )
+
+  return.matrix       <- data.matrix(daily.returns.data.wide[2:ncol(daily.returns.data.wide)], rownames.force=TRUE)
+  sample.correl.matrix       <- cor(return.matrix)
+  sample.covar.matrix  <- cov(return.matrix)
+  shrink.correl.matrix <- as.matrix(corpcor::cor.shrink(return.matrix))
+  shrink.covar.matrix  <- as.matrix(corpcor::cov.shrink(return.matrix))
+
+  S          <- diag(single.title.stats$sd)
+  R          <- sample.correl.matrix
+  SRS        <- S %*% R %*% S # same as covar matrix
+
+return(list(single.title.stats   = single.title.stats,
+            sample.correl.matrix = sample.correl.matrix,
+            sample.covar.matrix  = sample.covar.matrix,
+            shrink.correl.matrix = shrink.correl.matrix,
+            shrink.covar.matrix  = shrink.covar.matrix))
+  }
+
+
 
 
 #' PFstats
@@ -75,6 +106,8 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 
   daily.returns.data.wide <- daily.returns.data.wide[order(daily.returns.data.wide$ref.date),]
 
+
+  ## PORTFOLIO STATS
   PF.daily.return <- rep(NA,nrow(daily.returns.data.wide))
 
   for(i in 1:nrow(daily.returns.data.wide)) {
@@ -121,6 +154,7 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 
 
   return(list(PF.return.result.table = PF.return.result.table,
+
               plot.hist.daily.return = plot.hist.daily.return,
               plot.correl.matrix     = plot.correl.matrix))
 }
@@ -133,7 +167,8 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 
 #' meanVariancePortfolioOptimizer
 #'
-#' @description This function creates all important descriptive statistics such as VaR, ES, Return for a portfolio
+#' @description MPT mean Variance Portfolio Optimizer
+#' @param asset.name Name of assets available
 #' @param mu.vector vector with estimated returns of investment objects
 #' @param sigma.vector vector with the volatilities of the investment objects
 #' @param correl.matrix correlation matrix of the investment objects
@@ -145,7 +180,7 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf,print.out=FALSE) {
+meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf, print.out=FALSE) {
 
   one.vector <- rep(1,length(mu.vector))
   S          <- diag(sigma.vector)
