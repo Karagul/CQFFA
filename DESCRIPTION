@@ -11,5 +11,6 @@ Encoding: UTF-8
 Imports: 
         ggplot2, 
         BatchGetSymbols,
-        GGally
+        GGally,
+        corpcor
 RoxygenNote: 6.1.1
