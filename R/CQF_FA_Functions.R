@@ -67,16 +67,18 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 SingleTitlestats <- function(daily.returns.data.wide, num.trade.days.per.year=250) {
 
   single.title.stats <-    data.frame(mean.return   = colMeans(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)]*num.trade.days.per.year),
-                                      sd            = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd)
+                                      sd.day        = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd),
+                                      sd.year       = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd)*num.trade.days.per.year^0.5
                                       )
 
-  return.matrix       <- data.matrix(daily.returns.data.wide[2:ncol(daily.returns.data.wide)], rownames.force=TRUE)
-  sample.correl.matrix       <- cor(return.matrix)
+  return.matrix        <- data.matrix(daily.returns.data.wide[2:ncol(daily.returns.data.wide)], rownames.force=TRUE)
+
+  sample.correl.matrix <- cor(return.matrix)
   sample.covar.matrix  <- cov(return.matrix)
   shrink.correl.matrix <- as.matrix(corpcor::cor.shrink(return.matrix))
   shrink.covar.matrix  <- as.matrix(corpcor::cov.shrink(return.matrix))
 
-  S          <- diag(single.title.stats$sd)
+  S          <- diag(single.title.stats$sd.day)
   R          <- sample.correl.matrix
   SRS        <- S %*% R %*% S # same as covar matrix
 
@@ -180,12 +182,14 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf, print.out=FALSE) {
+meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf, print.out=FALSE, opt.focus.type="return") {
 
   one.vector <- rep(1,length(mu.vector))
   S          <- diag(sigma.vector)
   R          <- correl.matrix
   SRS        <- S %*% R %*% S
+
+  if(opt.focus.type=="return") {
 
   if(rf!=0) {
     optimal.weights = ((target.return-rf) * solve(SRS) %*% t(mu.vector-rf%*% one.vector)) /
@@ -220,8 +224,15 @@ meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, 
   if(print.out==TRUE) {print(paste("PF return:", round(pf.return,4)))}
   pf.vola <- as.numeric(sqrt(t(c(optimal.weights)) %*% SRS %*% c(optimal.weights)))
   if(print.out==TRUE) {print(paste("PF vola:", round(pf.vola,4)))}
+  }
 
 
+  if(opt.focus.type=="min.var") {
+    optimal.weights <- solve(SRS) %*% one.vector / as.numeric(t(one.vector) %*% solve(SRS) %*% one.vector)
+    weight.risky.assets <- sum(optimal.weights)
+    pf.vola <- as.numeric(sqrt(t(c(optimal.weights)) %*% SRS %*% c(optimal.weights)))
+    pf.return <- NA
+  }
 
   result.table <- data.frame(asset.name      = c("risk free",asset.name),
                              optimal.weights = c(round(1-weight.risky.assets,4), optimal.weights),
@@ -229,7 +240,6 @@ meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, 
                              pf.vola         = pf.vola,
                              rf.free         = rf)
 
-  result.table
   return(result.table = result.table )
 }
 
