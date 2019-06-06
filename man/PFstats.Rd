@@ -4,12 +4,15 @@
 \alias{PFstats}
 \title{PFstats}
 \usage{
-PFstats(weights.vector, daily.returns.data.wide)
+PFstats(weights.vector, daily.returns.data.wide,
+  num.trade.days.per.year = 250)
 }
 \arguments{
 \item{weights.vector}{vector that contains the relative weights of the individual assets of the portfolio}
 
 \item{daily.returns.data.wide}{data.frame including the daily returns of the specific assets as well as a reference date}
+
+\item{num.trade.days.per.year}{Number of trading days per year, default set to 250}
 }
 \value{
 a list with a data.frame PF.return.result.table that includes all statistics, as well as two graphs - histogram with returns and a correlation matrix

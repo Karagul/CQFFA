@@ -5,9 +5,12 @@
 \title{meanVariancePortfolioOptimizer}
 \usage{
 meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector,
-  correl.matrix, target.return, rf, print.out = FALSE)
+  correl.matrix, target.return, rf, print.out = FALSE,
+  opt.focus.type = "return")
 }
 \arguments{
+\item{asset.name}{Name of assets available}
+
 \item{mu.vector}{vector with estimated returns of investment objects}
 
 \item{sigma.vector}{vector with the volatilities of the investment objects}
@@ -22,7 +25,7 @@ meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector,
 weight.risky.assets a vector with the weights of the risky assets
 }
 \description{
-This function creates all important descriptive statistics such as VaR, ES, Return for a portfolio
+MPT mean Variance Portfolio Optimizer
 }
 \examples{
 weights.vector          <- c(0.7,0.3)

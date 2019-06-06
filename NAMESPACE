@@ -2,6 +2,7 @@
 
 export(CVaRPortfolioOptimizer)
 export(PFstats)
+export(SingleTitlestats)
 export(etlFinData)
 export(histCVaRcalc)
 export(meanVariancePortfolioOptimizer)
