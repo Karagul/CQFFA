@@ -66,9 +66,10 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
 #' @export
 SingleTitlestats <- function(daily.returns.data.wide, num.trade.days.per.year=250) {
 
-  single.title.stats <-    data.frame(mean.return   = colMeans(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)]*num.trade.days.per.year),
-                                      sd.day        = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd),
-                                      sd.year       = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd)*num.trade.days.per.year^0.5
+  single.title.stats <-    data.frame(mean.return     = colMeans(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)]*num.trade.days.per.year),
+                                      mean.return.day = colMeans(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)]),
+                                      sd.day          = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd),
+                                      sd.year         = apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, sd)*num.trade.days.per.year^0.5
                                       )
 
   return.matrix        <- data.matrix(daily.returns.data.wide[2:ncol(daily.returns.data.wide)], rownames.force=TRUE)
@@ -332,5 +333,127 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) 
 
 
 
+#' generateOptimizationResultStats
+#'
+#' @description generate Optimization Result Stats
+#' @param out.of.sample.period.months how many months are considered for the out of sample period
+#' @param investment.period.months number of months of the investment horizon before the next rebalancing happens
+#' @param daily.returns.data.wide data frame with returns with out of sample return data as well as data for the actual investment period
+#' @param pf.opt.type type of optimization, min.var,
+#' @param covar.type either sample of
+#' @param correl.type either sample of
+#' @param vola.type sample
+#' @param exp.return expected return of the assets, default is sample - meaning that we take historical asset return as a best predictor
+#' @param target.return default is NA
+#' @param
+#' @return list with result data.frames: weights.result.table,
+#' @export
+generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
+                                            investment.period.months    = 12,
+                                            daily.returns.data.wide,
+                                            pf.opt.type   = "mpt.min.var",
+                                            covar.type    = "sample",
+                                            correl.type     = "sample",
+                                            vola.type     = "sample",
+                                            exp.return    = "sample",
+                                            target.return = NA) {
+
+first.out.of.sample.date <- lubridate::floor_date(min(daily.returns.data.wide$ref.date),"month")
+last.out.of.sample.date  <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date)  %m-% months(out.of.sample.period.months),"month")
+
+first.investment.date    <- lubridate::floor_date(min(daily.returns.data.wide$ref.date)  %m+% months(out.of.sample.period.months),"month")
+last.investment.date     <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date),"month")
 
 
+N.pf.rebalances         <- (length(seq(from=first.investment.date, to=last.investment.date, by="months"))-1)/investment.period.months
+
+portfolio.results.list     <- vector("list", N.pf.rebalances)
+weights.result.table.list  <- vector("list", N.pf.rebalances)
+
+for(i in 1:N.pf.rebalances) {
+  print(paste("Rebalancing Portfolio - RUN:",i))
+
+  # 1) GENERATE OUT OF SAMPLE DATA
+  out.of.sample.start.date <- lubridate::floor_date(first.out.of.sample.date %m+% months(investment.period.months*(i-1)),"month")
+  out.of.sample.end.date   <- out.of.sample.start.date %m+% months(out.of.sample.period.months)-1
+
+  print(paste("Out of Sample Period:",out.of.sample.start.date,"-",out.of.sample.end.date))
+
+  # load out of sample data
+  daily.returns.data.wide.out.of.sample <- daily.returns.data.wide[daily.returns.data.wide$ref.date >= out.of.sample.start.date &
+                                                                   daily.returns.data.wide$ref.date  <= out.of.sample.end.date,]
+
+  single.title.stats.list  <- SingleTitlestats(daily.returns.data.wide = daily.returns.data.wide.out.of.sample)
+
+  asset.name     <- as.character(rownames(single.title.stats.list$single.title.stats))
+
+  sigma.vector   <- if(vola.type    == "sample") {
+                      single.title.stats.list$single.title.stats$sd.day}
+
+  correl.matrix  <- if(correl.type    == "sample") {
+                       single.title.stats.list$sample.correl.matrix}
+
+  covar.matrix  <- if(covar.type    == "sample") {
+                      single.title.stats.list$sample.covar.matrix}
+
+
+  mu.vector     <- if(exp.return    == "sample") {
+                      single.title.stats.list$single.title.stats$mean.return.day
+                     }
+
+
+  ## 2) RUN OPTIMIZATION AND GET WEIGHTS
+
+  weights.vector <- if(pf.opt.type=="mpt.min.var") {
+    print(paste("OPTIMIZATION TYPE:",pf.opt.type))
+      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
+      weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
+  }
+
+
+
+  weights.result.table <- data.frame(start.out.of.sample = min(daily.returns.data.wide.out.of.sample$ref.date),
+                                     end.out.of.sample   = max(daily.returns.data.wide.out.of.sample$ref.date),
+                                     asset.name          = asset.name,
+                                     weights             = weights.vector)
+
+
+  weights.result.table.list[[i]] <- weights.result.table
+
+  # 3) GENERATE DATA FOR INVESTMENT PERIOD
+
+  investment.period.start.date <- lubridate::floor_date(first.investment.date %m+% months(investment.period.months*(i-1)),"month")
+  investment.period.end.date   <- investment.period.start.date %m+% months(investment.period.months*(i))-1
+
+  daily.returns.data.wide.investment.period <- daily.returns.data.wide[daily.returns.data.wide$ref.date  >= investment.period.start.date &
+                                                                       daily.returns.data.wide$ref.date  <= investment.period.end.date,]
+
+  # 4) GENERATE PORTFOLIO RESULTS FOR INVESTMENT PERIOD
+   pf.result <- PFstats(weights.vector          = weights.vector,
+                       daily.returns.data.wide = daily.returns.data.wide.investment.period,
+                       num.trade.days.per.year = 250)
+  portfolio.results.list[[i]] <- pf.result$PF.return.result.table
+}
+
+portfolio.results.table <- dplyr::bind_rows(portfolio.results.list)
+weights.result.table    <- dplyr::bind_rows(weights.result.table.list)
+
+portfolio.results.table <- data.frame(        Year     = as.character(lubridate::year(portfolio.results.table$start.date)),
+                                              Return  = portfolio.results.table$PF.total.return*100,
+                                              Lowest  = portfolio.results.table$PF.min.start.to.date.return*100,
+                                              Vola    = portfolio.results.table$PF.annualized.vola*100,
+                                              SR      = portfolio.results.table$PF.sharpe.ratio*100,
+                                              VaR     = portfolio.results.table$PF.hist.1dVaR95*100,
+                                              CVaR    = portfolio.results.table$PF.hist.1dES95*100,
+                                              Sortino = portfolio.results.table$PF.sortino.ratio*100
+)
+
+
+results.table.avg <- cbind(data.frame(Year="Average"),as.data.frame.list(colMeans(portfolio.results.table[,2:ncol(portfolio.results.table)])))
+
+results.table.x <- rbind(portfolio.results.table, results.table.avg)
+
+return(list(portfolio.results.table = portfolio.results.table,
+            weights.result.table    = weights.result.table,
+            results.table.x         = results.table.x))
+}
