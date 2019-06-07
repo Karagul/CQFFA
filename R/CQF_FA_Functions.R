@@ -432,7 +432,7 @@ for(i in 1:N.pf.rebalances) {
   # 3) GENERATE DATA FOR INVESTMENT PERIOD
 
   investment.period.start.date <- lubridate::floor_date(first.investment.date %m+% months(investment.period.months*(i-1)),"month")
-  investment.period.end.date   <- investment.period.start.date %m+% months(investment.period.months*(i))-1
+  investment.period.end.date   <- investment.period.start.date %m+% months(investment.period.months)-1
 
   daily.returns.data.wide.investment.period <- daily.returns.data.wide[daily.returns.data.wide$ref.date  >= investment.period.start.date &
                                                                        daily.returns.data.wide$ref.date  <= investment.period.end.date,]
