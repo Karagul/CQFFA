@@ -404,13 +404,22 @@ for(i in 1:N.pf.rebalances) {
 
   ## 2) RUN OPTIMIZATION AND GET WEIGHTS
 
-  weights.vector <- if(pf.opt.type=="mpt.min.var") {
-    print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
-      weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
-  }
-
-
+                    # 1/N
+  weights.vector <- if(pf.opt.type=="1/N") {
+                      print(paste("OPTIMIZATION TYPE:",pf.opt.type))
+                      weights.vector <- rep(1/length(asset.name),length(asset.name))
+                      print(weights.vector)
+                      # mpt.min.var
+                    } else if(pf.opt.type=="mpt.min.var") {
+                      print(paste("OPTIMIZATION TYPE:",pf.opt.type))
+                      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
+                      weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
+                     # mpt.tar.ret
+                     } else if(pf.opt.type=="mpt.tar.ret") {
+                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
+                       weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="return")$optimal.weights
+                       weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
+                     }
 
   weights.result.table <- data.frame(start.out.of.sample = min(daily.returns.data.wide.out.of.sample$ref.date),
                                      end.out.of.sample   = max(daily.returns.data.wide.out.of.sample$ref.date),
@@ -438,14 +447,14 @@ for(i in 1:N.pf.rebalances) {
 portfolio.results.table <- dplyr::bind_rows(portfolio.results.list)
 weights.result.table    <- dplyr::bind_rows(weights.result.table.list)
 
-portfolio.results.table <- data.frame(        Year     = as.character(lubridate::year(portfolio.results.table$start.date)),
-                                              Return  = portfolio.results.table$PF.total.return*100,
-                                              Lowest  = portfolio.results.table$PF.min.start.to.date.return*100,
-                                              Vola    = portfolio.results.table$PF.annualized.vola*100,
-                                              SR      = portfolio.results.table$PF.sharpe.ratio*100,
-                                              VaR     = portfolio.results.table$PF.hist.1dVaR95*100,
-                                              CVaR    = portfolio.results.table$PF.hist.1dES95*100,
-                                              Sortino = portfolio.results.table$PF.sortino.ratio*100
+portfolio.results.table <- data.frame(        Year    = as.character(lubridate::year(portfolio.results.table$start.date)),
+                                              Return  = portfolio.results.table$PF.total.return,
+                                              Lowest  = portfolio.results.table$PF.min.start.to.date.return,
+                                              Vola    = portfolio.results.table$PF.annualized.vola,
+                                              SR      = portfolio.results.table$PF.sharpe.ratio,
+                                              VaR     = portfolio.results.table$PF.hist.1dVaR95,
+                                              CVaR    = portfolio.results.table$PF.hist.1dES95,
+                                              Sortino = portfolio.results.table$PF.sortino.ratio
 )
 
 
