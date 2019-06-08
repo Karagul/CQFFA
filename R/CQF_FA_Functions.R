@@ -2,6 +2,8 @@
 # Author: Fabian Arter
 # Date: 2019-05-29
 
+# generate PDF manual
+# system("R CMD Rd2pdf /Users/fabianarter/Library/Mobile Documents/com~apple~CloudDocs/Education/CQF/Final_Project/CQFFA")
 
 ###############################################################
 
@@ -394,7 +396,11 @@ for(i in 1:N.pf.rebalances) {
                        single.title.stats.list$sample.correl.matrix}
 
   covar.matrix  <- if(covar.type    == "sample") {
-                      single.title.stats.list$sample.covar.matrix}
+                      single.title.stats.list$sample.covar.matrix} else
+                    if(covar.type    == "shrink") {
+                      single.title.stats.list$shrink.covar.matrix
+                      }
+
 
 
   mu.vector     <- if(exp.return    == "sample") {
