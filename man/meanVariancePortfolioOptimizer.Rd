@@ -5,8 +5,8 @@
 \title{meanVariancePortfolioOptimizer}
 \usage{
 meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector,
-  correl.matrix, target.return, rf, print.out = FALSE,
-  opt.focus.type = "return")
+  correl.matrix, covar.matrix = NA, use.covar.matrix = FALSE,
+  target.return, rf, print.out = FALSE, opt.focus.type = "return")
 }
 \arguments{
 \item{asset.name}{Name of assets available}
@@ -17,9 +17,13 @@ meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector,
 
 \item{correl.matrix}{correlation matrix of the investment objects}
 
+\item{use.covar.matrix}{use covariance matrix directly or build it via sigma vector and the correlation matrix, default is FALSE}
+
 \item{target.return}{which return level is seeked (for which the variance is minimized)}
 
 \item{rf}{risk free return}
+
+\item{covar.matrx}{covariance matrix}
 }
 \value{
 weight.risky.assets a vector with the weights of the risky assets

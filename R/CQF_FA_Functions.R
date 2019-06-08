@@ -177,6 +177,8 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' @param mu.vector vector with estimated returns of investment objects
 #' @param sigma.vector vector with the volatilities of the investment objects
 #' @param correl.matrix correlation matrix of the investment objects
+#' @param covar.matrx covariance matrix
+#' @param use.covar.matrix use covariance matrix directly or build it via sigma vector and the correlation matrix, default is FALSE
 #' @param target.return which return level is seeked (for which the variance is minimized)
 #' @param rf risk free return
 #' @return weight.risky.assets a vector with the weights of the risky assets
@@ -185,12 +187,13 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf, print.out=FALSE, opt.focus.type="return") {
+meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix=NA, use.covar.matrix=FALSE, target.return, rf, print.out=FALSE, opt.focus.type="return") {
 
-  one.vector <- rep(1,length(mu.vector))
+  SRS <- if(use.covar.matrix==FALSE) {one.vector <- rep(1,length(mu.vector))
   S          <- diag(sigma.vector)
   R          <- correl.matrix
   SRS        <- S %*% R %*% S
+  } else {covar.matrix}
 
   if(opt.focus.type=="return") {
 
@@ -347,7 +350,7 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) 
 #' @param vola.type sample
 #' @param exp.return expected return of the assets, default is sample - meaning that we take historical asset return as a best predictor
 #' @param target.return default is NA
-#' @param
+#' @param in.sample default is FALSE
 #' @return list with result data.frames: weights.result.table,
 #' @export
 generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
@@ -358,10 +361,11 @@ generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
                                             correl.type     = "sample",
                                             vola.type     = "sample",
                                             exp.return    = "sample",
-                                            target.return = NA) {
+                                            target.return = NA,
+                                            in.sample     = FALSE) {
 
 first.out.of.sample.date <- lubridate::floor_date(min(daily.returns.data.wide$ref.date),"month")
-last.out.of.sample.date  <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date)  %m-% months(out.of.sample.period.months),"month")
+#last.out.of.sample.date  <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date)  %m-% months(out.of.sample.period.months),"month")
 
 first.investment.date    <- lubridate::floor_date(min(daily.returns.data.wide$ref.date)  %m+% months(out.of.sample.period.months),"month")
 last.investment.date     <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date),"month")
@@ -378,14 +382,22 @@ for(i in 1:N.pf.rebalances) {
   # 1) GENERATE OUT OF SAMPLE DATA
   out.of.sample.start.date <- lubridate::floor_date(first.out.of.sample.date %m+% months(investment.period.months*(i-1)),"month")
   out.of.sample.end.date   <- out.of.sample.start.date %m+% months(out.of.sample.period.months)-1
-
   print(paste("Out of Sample Period:",out.of.sample.start.date,"-",out.of.sample.end.date))
 
-  # load out of sample data
-  daily.returns.data.wide.out.of.sample <- daily.returns.data.wide[daily.returns.data.wide$ref.date >= out.of.sample.start.date &
-                                                                   daily.returns.data.wide$ref.date  <= out.of.sample.end.date,]
+  investment.period.start.date <- lubridate::floor_date(first.investment.date %m+% months(investment.period.months*(i-1)),"month")
+  investment.period.end.date   <- investment.period.start.date %m+% months(investment.period.months)-1
+  print(paste("Investment Period:",investment.period.start.date,"-",investment.period.end.date))
 
-  single.title.stats.list  <- SingleTitlestats(daily.returns.data.wide = daily.returns.data.wide.out.of.sample)
+  # load out of sample data
+  daily.returns.data.wide.out.of.sample <- if(in.sample == FALSE) { daily.returns.data.wide[daily.returns.data.wide$ref.date >= out.of.sample.start.date &
+                                                                                           daily.returns.data.wide$ref.date <= out.of.sample.end.date,] } else {
+                                                                     daily.returns.data.wide[daily.returns.data.wide$ref.date  >= investment.period.start.date &
+                                                                                             daily.returns.data.wide$ref.date  <= investment.period.end.date,]
+                                                                   }
+
+   single.title.stats.list <- SingleTitlestats(daily.returns.data.wide = daily.returns.data.wide.out.of.sample)
+
+
 
   asset.name     <- as.character(rownames(single.title.stats.list$single.title.stats))
 
@@ -396,10 +408,11 @@ for(i in 1:N.pf.rebalances) {
                        single.title.stats.list$sample.correl.matrix}
 
   covar.matrix  <- if(covar.type    == "sample") {
-                      single.title.stats.list$sample.covar.matrix} else
+                      single.title.stats.list$sample.covar.matrix } else
                     if(covar.type    == "shrink") {
                       single.title.stats.list$shrink.covar.matrix
-                      }
+                    } else stop("WRONG covar.type")
+  print(paste("COVAR Type:",covar.type))
 
 
 
@@ -418,12 +431,12 @@ for(i in 1:N.pf.rebalances) {
                       # mpt.min.var
                     } else if(pf.opt.type=="mpt.min.var") {
                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-                      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
+                      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
                       weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
                      # mpt.tar.ret
                      } else if(pf.opt.type=="mpt.tar.ret") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-                       weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, target.return, rf=0, opt.focus.type="return")$optimal.weights
+                       weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix,covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="return")$optimal.weights
                        weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
                      }
 
@@ -437,8 +450,6 @@ for(i in 1:N.pf.rebalances) {
 
   # 3) GENERATE DATA FOR INVESTMENT PERIOD
 
-  investment.period.start.date <- lubridate::floor_date(first.investment.date %m+% months(investment.period.months*(i-1)),"month")
-  investment.period.end.date   <- investment.period.start.date %m+% months(investment.period.months)-1
 
   daily.returns.data.wide.investment.period <- daily.returns.data.wide[daily.returns.data.wide$ref.date  >= investment.period.start.date &
                                                                        daily.returns.data.wide$ref.date  <= investment.period.end.date,]
