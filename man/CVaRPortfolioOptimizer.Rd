@@ -4,12 +4,11 @@
 \alias{CVaRPortfolioOptimizer}
 \title{CVaRPortfolioOptimizer}
 \usage{
-CVaRPortfolioOptimizer(daily.returns.data.wide, alpha.cvar = 0.05)
+CVaRPortfolioOptimizer(daily.returns.data.wide, alpha.cvar = 0.05,
+  rmin = 0, wmin = 0, wmax = 1, weight.sum = 1)
 }
 \arguments{
 \item{daily.returns.data.wide}{data.frame including the daily returns of the specific assets as well as a reference date}
-
-\item{asset.names}{Vector with names of the single assets in the portfolio to be optimized}
 
 \item{alpha}{Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated}
 }

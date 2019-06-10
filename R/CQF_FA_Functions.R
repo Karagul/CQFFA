@@ -284,67 +284,41 @@ histCVaRcalc = function(asset.weights=1, daily.returns.data.wide, alpha.cvar){
 
 
 
-
 #' CVaRPortfolioOptimizer
 #'
 #' @description CVaR Portfolio Optimizer
-#' @param asset.names Vector with names of the single assets in the portfolio to be optimized
 #' @param daily.returns.data.wide data.frame including the daily returns of the specific assets as well as a reference date
 #' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
+#' @param rmin
+#' @param wmin
+#' @param wmax
+#' @param weight.sum
 #' @return cvar CVaR of the specific portfolio or asset with the set alpha
 #' @export
-CVaRPortfolioOptimizer <- function(daily.returns.data.wide, alpha.cvar=0.05) {
+CVaRPortfolioOptimizer = function(daily.returns.data.wide, alpha.cvar=0.05, rmin=0, wmin=0, wmax=1, weight.sum=1)
+{
 
-  asset.weights <- rep(1/(length(daily.returns.data.wide)-1), length(daily.returns.data.wide)-1)
-
-  #linear equality constraint
-  #note: nloptr requires all functions to have the same signature
-  eval_g0 <- function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA) {
-    return( sum(asset.weights) - 1 )
-  }
-
-  #numerical approximation of the gradient
-  des = function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA){
-    n = length(asset.weights)
-    out = asset.weights;
-    for (i in 0:n){
-      up = asset.weights;
-      dn = asset.weights;
-      up[i] = up[i]+.0001
-      dn[i] = dn[i]-.0001
-      out[i] = (histCVaRcalc(up,daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar) - histCVaRcalc(dn,daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar))/.0002
-    }
-    return(out)
-  }
+  rmat = as.matrix(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)])
 
 
-  #function to optimize ??? a list of objective and gradient
-  toOpt = function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA){
-    list(objective=histCVaRcalc(asset.weights, daily.returns.data.wide,alpha.cvar), gradient=des(asset.weights, daily.returns.data.wide,alpha.cvar=alpha.cvar))
-  }
-
-  #equality constraint function.  The jacobian is 1 for all variables
-  eqCon = function(asset.weights,daily.returns.data.wide=NA,alpha.cvar=NA){
-    list(constraints=eval_g0(asset.weights,daily.returns.data.wide=NA,alpha.cvar=alpha.cvar),jacobian=rep(1,length(asset.weights)))
-  }
-  #optimization options
-  opts <- list( "algorithm" = "NLOPT_LD_SLSQP",
-                "xtol_rel" = 1.0e-7,
-                "maxeval" = 10000)
-  #run optimization and print results
-  nl = nloptr::nloptr(asset.weights,toOpt,
-              lb = rep(0,length(asset.weights)),
-              ub = rep(1,length(asset.weights)),
-              eval_g_eq=eqCon,
-              opts=opts,
-              daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar)
-
-  optimal.weights = nl$solution
-
+  n = ncol(rmat) # number of assets
+  s = nrow(rmat) # number of scenarios i.e. periods
+  averet = colMeans(rmat)
+  # creat objective vector, constraint matrix, constraint rhs
+  Amat = rbind(cbind(rbind(1,averet),matrix(data=0,nrow=2,ncol=s+1)),
+               cbind(rmat,diag(s),1))
+  objL = c(rep(0,n), rep(-1/(alpha.cvar*s), s), -1)
+  bvec = c(weight.sum,rmin,rep(0,s))
+  # direction vector
+  dir.vec = c("==",">=",rep(">=",s))
+  # bounds on weights
+  bounds = list(lower = list(ind = 1:n, val = rep(wmin,n)),
+                upper = list(ind = 1:n, val = rep(wmax,n)))
+  res = Rglpk::Rglpk_solve_LP(obj=objL, mat=Amat, dir=dir.vec, rhs=bvec,
+                       types=rep("C",length(objL)), max=T, bounds=bounds)
+  optimal.weights = as.numeric(res$solution[1:n])
   return(optimal.weights)
 }
-
-
 
 
 #' generateOptimizationResultStats
