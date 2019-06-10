@@ -45,13 +45,20 @@ etlFinData <- function(start.date=as.Date("2019-01-01"),
   daily.returns.data.wide <- na.omit(daily.returns.data.wide)
 
   # cumulated returns wide
-  cumulated.returns.data.wide  <- as.data.frame(cbind(ref.date = daily.returns.data.wide$ref.date, apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, cumsum)))
+  cumulated.returns.data.wide  <- if(nrow(input.tickers.df) !=1) {
+    as.data.frame(cbind(ref.date = daily.returns.data.wide$ref.date, apply(daily.returns.data.wide[,2:ncol(daily.returns.data.wide)], 2, cumsum)))
+  }
+
 
   # cumulated returns long
+  cumulated.returns.data.long <- if(nrow(input.tickers.df) !=1) {
   cumulated.returns.data.long               <- reshape2::melt(cumulated.returns.data.wide, id.vars=1, measure.vars = 2:ncol(cumulated.returns.data.wide))
   cumulated.returns.data.long$ref.date      <- as.Date(cumulated.returns.data.long$ref.date, origin = "1970-01-01")
   cumulated.returns.data.long$name          <- as.character(cumulated.returns.data.long$variable) ; cumulated.returns.data.long$variable <- NULL
   cumulated.returns.data.long$cumul.return  <- cumulated.returns.data.long$value ; cumulated.returns.data.long$value <- NULL
+  } else {
+    data.frame(ref.date = daily.returns.data.long$ref.date, name = daily.returns.data.long$friendly.name, cumul.return=cumsum(daily.returns.data.long$daily.return))
+  }
 
   return(list(daily.returns.data.long     = daily.returns.data.long,
               daily.returns.data.wide     = daily.returns.data.wide,
@@ -189,7 +196,9 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' @export
 meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix=NA, use.covar.matrix=FALSE, target.return, rf, print.out=FALSE, opt.focus.type="return") {
 
-  SRS <- if(use.covar.matrix==FALSE) {one.vector <- rep(1,length(mu.vector))
+  one.vector <- rep(1,length(mu.vector))
+
+  SRS <- if(use.covar.matrix==FALSE) {
   S          <- diag(sigma.vector)
   R          <- correl.matrix
   SRS        <- S %*% R %*% S
@@ -256,12 +265,14 @@ meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, 
 #'
 #' @description calculates the historical Conditional VaR / Expected Shortfall of a portfolio or an asset
 #' @param daily.returns Daily historical returns of a portfolio or single asset
-#' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
+#' @param alpha.cvar Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
 #' @return cvar CVaR of the specific portfolio or asset with the set alpha
 #' @export
-histCVaRcalc = function(daily.returns, alpha){
+histCVaRcalc = function(asset.weights=1, daily.returns.data.wide, alpha.cvar){
 
-  i.num = alpha * length(portfolio.returns)
+  i.num = ceiling(alpha.cvar * nrow(daily.returns.data.wide))
+
+  portfolio.returns <- as.matrix(daily.returns.data.wide[,2:length(daily.returns.data.wide)]) %*% c(asset.weights)
 
   portfolio.returns <- sort(portfolio.returns)
 
@@ -281,18 +292,18 @@ histCVaRcalc = function(daily.returns, alpha){
 #' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
 #' @return cvar CVaR of the specific portfolio or asset with the set alpha
 #' @export
-CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) {
+CVaRPortfolioOptimizer <- function(daily.returns.data.wide, alpha.cvar=0.05) {
 
-  asset.weights <- rep(1/length(asset.names), length(asset.names))
+  asset.weights <- rep(1/(length(daily.returns.data.wide)-1), length(daily.returns.data.wide)-1)
 
   #linear equality constraint
   #note: nloptr requires all functions to have the same signature
-  eval_g0 <- function(asset.weights, ddaily.returns.data.wide=NA, alpha=NA) {
+  eval_g0 <- function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA) {
     return( sum(asset.weights) - 1 )
   }
 
   #numerical approximation of the gradient
-  des = function(asset.weights, daily.returns.data.wide=NA, alpha=NA){
+  des = function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA){
     n = length(asset.weights)
     out = asset.weights;
     for (i in 0:n){
@@ -300,39 +311,36 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) 
       dn = asset.weights;
       up[i] = up[i]+.0001
       dn[i] = dn[i]-.0001
-      out[i] = (histCVaRcalc(up,daily.returns.data.wide=daily.returns.data.wide,alpha=alpha) - histCVaRcalc(dn,daily.returns.data.wide=daily.returns.data.wide,alpha=alpha))/.0002
+      out[i] = (histCVaRcalc(up,daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar) - histCVaRcalc(dn,daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar))/.0002
     }
     return(out)
   }
 
-  #use nloptr to check out gradient
-  #check.derivatives(w,es,des,sim=sim, alpha=.05)
 
   #function to optimize ??? a list of objective and gradient
-  toOpt = function(asset.weights, daily.returns.data.wide=NA, alpha=NA){
-    list(objective=histCVaRcalc(asset.weights, daily.returns.data.wide,alpha), gradient=des(asset.weights, daily.returns.data.wide,alpha=alpha))
+  toOpt = function(asset.weights, daily.returns.data.wide=NA, alpha.cvar=NA){
+    list(objective=histCVaRcalc(asset.weights, daily.returns.data.wide,alpha.cvar), gradient=des(asset.weights, daily.returns.data.wide,alpha.cvar=alpha.cvar))
   }
 
   #equality constraint function.  The jacobian is 1 for all variables
-  eqCon = function(asset.weights,daily.returns.data.wide=NA,alpha=NA){
-    list(constraints=eval_g0(asset.weights,daily.returns.data.wide=NA,alpha=alpha),jacobian=rep(1,length(asset.weights)))
+  eqCon = function(asset.weights,daily.returns.data.wide=NA,alpha.cvar=NA){
+    list(constraints=eval_g0(asset.weights,daily.returns.data.wide=NA,alpha.cvar=alpha.cvar),jacobian=rep(1,length(asset.weights)))
   }
   #optimization options
   opts <- list( "algorithm" = "NLOPT_LD_SLSQP",
                 "xtol_rel" = 1.0e-7,
                 "maxeval" = 10000)
   #run optimization and print results
-  nl = nloptr(asset.weights,toOpt,
+  nl = nloptr::nloptr(asset.weights,toOpt,
               lb = rep(0,length(asset.weights)),
               ub = rep(1,length(asset.weights)),
               eval_g_eq=eqCon,
               opts=opts,
-              daily.returns.data.wide=daily.returns.data.wide,alpha=alpha)
+              daily.returns.data.wide=daily.returns.data.wide,alpha.cvar=alpha.cvar)
 
-  s = nl$solution
-  obj = nl$objective
+  optimal.weights = nl$solution
 
-  return(s)
+  return(optimal.weights)
 }
 
 
@@ -350,7 +358,9 @@ CVaRPortfolioOptimizer <- function(asset.names, daily.returns.data.wide, alpha) 
 #' @param vola.type sample
 #' @param exp.return expected return of the assets, default is sample - meaning that we take historical asset return as a best predictor
 #' @param target.return default is NA
+#' @param alpha.cvar Alpha parameter for CVaR optimization only, default is NA
 #' @param in.sample default is FALSE
+#'
 #' @return list with result data.frames: weights.result.table,
 #' @export
 generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
@@ -362,6 +372,7 @@ generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
                                             vola.type     = "sample",
                                             exp.return    = "sample",
                                             target.return = NA,
+                                            alpha.cvar    = NA,
                                             in.sample     = FALSE) {
 
 first.out.of.sample.date <- lubridate::floor_date(min(daily.returns.data.wide$ref.date),"month")
@@ -429,19 +440,25 @@ for(i in 1:N.pf.rebalances) {
                       weights.vector <- rep(1/length(asset.name),length(asset.name))
                       print(weights.vector)
                       # mpt.min.var
-                    } else if(pf.opt.type=="mpt.min.var") {
+                    } else if(pf.opt.type == "mpt.min.var") {
                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
                       weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
                       weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
                      # mpt.tar.ret
-                     } else if(pf.opt.type=="mpt.tar.ret") {
+                     } else if(pf.opt.type == "mpt.tar.ret") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
                        weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix,covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="return")$optimal.weights
                        weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
+                     }else if(pf.opt.type == "cvar") {
+                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
+                       weights.vector <- CVaRPortfolioOptimizer(daily.returns.data.wide = daily.returns.data.wide.out.of.sample, alpha.cvar = alpha.cvar)
                      }
 
   weights.result.table <- data.frame(start.out.of.sample = min(daily.returns.data.wide.out.of.sample$ref.date),
                                      end.out.of.sample   = max(daily.returns.data.wide.out.of.sample$ref.date),
+                                     investment.start    = investment.period.start.date,
+                                     investment.end      = investment.period.end.date,
+                                     pf.opt.type         = pf.opt.type,
                                      asset.name          = asset.name,
                                      weights             = weights.vector)
 
