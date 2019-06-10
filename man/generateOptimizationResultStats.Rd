@@ -8,7 +8,8 @@ generateOptimizationResultStats(out.of.sample.period.months = 24,
   investment.period.months = 12, daily.returns.data.wide,
   pf.opt.type = "mpt.min.var", covar.type = "sample",
   correl.type = "sample", vola.type = "sample",
-  exp.return = "sample", target.return = NA, in.sample = FALSE)
+  exp.return = "sample", target.return = NA, alpha.cvar = NA,
+  in.sample = FALSE)
 }
 \arguments{
 \item{out.of.sample.period.months}{how many months are considered for the out of sample period}
@@ -28,6 +29,8 @@ generateOptimizationResultStats(out.of.sample.period.months = 24,
 \item{exp.return}{expected return of the assets, default is sample - meaning that we take historical asset return as a best predictor}
 
 \item{target.return}{default is NA}
+
+\item{alpha.cvar}{Alpha parameter for CVaR optimization only, default is NA}
 
 \item{in.sample}{default is FALSE}
 }

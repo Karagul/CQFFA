@@ -4,12 +4,12 @@
 \alias{histCVaRcalc}
 \title{histCVaRcalc}
 \usage{
-histCVaRcalc(daily.returns, alpha)
+histCVaRcalc(asset.weights = 1, daily.returns.data.wide, alpha.cvar)
 }
 \arguments{
-\item{daily.returns}{Daily historical returns of a portfolio or single asset}
+\item{alpha.cvar}{Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated}
 
-\item{alpha}{Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated}
+\item{daily.returns}{Daily historical returns of a portfolio or single asset}
 }
 \value{
 cvar CVaR of the specific portfolio or asset with the set alpha
