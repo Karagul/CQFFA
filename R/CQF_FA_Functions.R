@@ -115,7 +115,7 @@ return(list(single.title.stats   = single.title.stats,
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.year=250) {
+PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.year=250, long.term.mean.return=0, long.term.sd.return=0.01) {
 
   daily.returns.data.wide <- daily.returns.data.wide[order(daily.returns.data.wide$ref.date),]
 
@@ -150,11 +150,11 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
   # PLOTS
 
   #### HISTOGRAM
-  plot.hist.daily.return <- ggplot2::ggplot(data=data.frame(PF.daily.return), aes(PF.daily.return))
-  plot.hist.daily.return <- plot.hist.daily.return + geom_histogram(aes(y=..density..), color="black", fill = "darkblue",binwidth = 0.002, alpha = 0.2) + xlim(-0.05,0.05)
-  plot.hist.daily.return <- plot.hist.daily.return + stat_function(fun = dnorm, colour = "red", args = list(mean = mean(PF.daily.return), sd = sd(PF.daily.return)))
+  plot.hist.daily.return <- ggplot2::ggplot(data=data.frame(PF.daily.return), ggplot2::aes(PF.daily.return))
+  plot.hist.daily.return <- plot.hist.daily.return + geom_histogram(aes(y=..density..), color="black", fill = "steelblue",binwidth = 0.003, alpha = 0.2) + xlim(-0.06,0.06)  + ylim(0,120)
+  plot.hist.daily.return <- plot.hist.daily.return + geom_density()
+  plot.hist.daily.return <- plot.hist.daily.return + stat_function(fun = dnorm, colour = "red", args = list(mean = long.term.mean.return, sd = long.term.sd.return))
   plot.hist.daily.return <- plot.hist.daily.return + labs(title = paste0("Portfolio daily returns"," - PF ann. vola: ",round(PF.return.result.table$PF.annualized.vola*100,3),"%"), subtitle = paste(PF.return.result.table$start.date, " - ",PF.return.result.table$end.date))
-
 
 
   #### CORREL MATRIX
@@ -318,6 +318,46 @@ CVaRPortfolioOptimizer = function(daily.returns.data.wide, alpha.cvar=0.05, rmin
                        types=rep("C",length(objL)), max=T, bounds=bounds)
   optimal.weights = as.numeric(res$solution[1:n])
   return(optimal.weights)
+}
+
+
+
+#' BLPortfolioOptimizer
+#'
+#' @description Black Litterman Portfolio Optimizer
+#' @param risk.aversion.coeff (lambda) risk aversion coefficient, default is 3
+#' @param covar.matrix Covariance Matrix of N assets
+#' @param market.cap.weights is a vector with the market capitalization weights
+#'
+#' @param tau default is 0.025
+#' @param ident.view.matrix (BL: P) Matrix that identifies the assets involved in the views (K x N Matrix)
+#' @param diag.covar.error.matrix (BL: E)  A diagonal covariance matrix of error terms from the expressed views representing the uncertainty in each view ( K x K Matrix)
+#' @param view.vector Vector including the Views (K x 1 column vector)
+#' @return cvar CVaR of the specific portfolio or asset with the set alpha
+#' @export
+BLPortfolioOptimizer = function(risk.aversion.coeff=3,
+                                tau=0.025,
+                                covar.matrix,
+                                market.cap.weights,
+                                ident.view.matrix,
+                                diag.covar.error.matrix,
+                                view.vector)
+{
+
+  # 1) Excess Market Returns
+  market.returns.vector <- risk.aversion.coeff %*% covar.matrix %*% market.cap.weights
+
+  print(paste("Market Returns:",market.returns.vector))
+
+  # 2) Expected Returns
+  expected.returns.vector <- solve(solve(tau%*% covar.matrix)+t(ident.view.matrix) %*% solve(diag.covar.error.matrix)%*% ident.view.matrix)%*%
+                                   (solve(tau%*% covar.matrix) %*% market.returns.vector + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
+
+
+  # 3) Uncertainty of Returns
+
+  uncert.returns.vector <-
+
 }
 
 
