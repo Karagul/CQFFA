@@ -115,7 +115,11 @@ return(list(single.title.stats   = single.title.stats,
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.year=250, long.term.mean.return=0, long.term.sd.return=0.01) {
+PFstats <- function(weights.vector,
+                    daily.returns.data.wide,
+                    num.trade.days.per.year=250,
+                    long.term.mean.return=0,
+                    long.term.sd.return=0.01) {
 
   daily.returns.data.wide <- daily.returns.data.wide[order(daily.returns.data.wide$ref.date),]
 
@@ -195,7 +199,16 @@ PFstats <- function(weights.vector, daily.returns.data.wide, num.trade.days.per.
 #' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
 #' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
 #' @export
-meanVariancePortfolioOptimizer <- function(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix=NA, use.covar.matrix=FALSE, target.return, rf, print.out=FALSE, opt.focus.type="return") {
+meanVariancePortfolioOptimizer <- function(asset.name,
+                                           mu.vector,
+                                           sigma.vector,
+                                           correl.matrix,
+                                           covar.matrix=NA,
+                                           use.covar.matrix=FALSE,
+                                           target.return,
+                                           rf,
+                                           print.out=FALSE,
+                                           opt.focus.type="return") {
 
   one.vector <- rep(1,length(mu.vector))
 
@@ -325,38 +338,52 @@ CVaRPortfolioOptimizer = function(daily.returns.data.wide, alpha.cvar=0.05, rmin
 #' BLPortfolioOptimizer
 #'
 #' @description Black Litterman Portfolio Optimizer
+#'
 #' @param risk.aversion.coeff (lambda) risk aversion coefficient, default is 3
-#' @param covar.matrix Covariance Matrix of N assets
 #' @param market.cap.weights is a vector with the market capitalization weights
 #'
 #' @param tau default is 0.025
+#' @param covar.matrix Covariance Matrix of N assets (N x N Matrix)
 #' @param ident.view.matrix (BL: P) Matrix that identifies the assets involved in the views (K x N Matrix)
-#' @param diag.covar.error.matrix (BL: E)  A diagonal covariance matrix of error terms from the expressed views representing the uncertainty in each view ( K x K Matrix)
-#' @param view.vector Vector including the Views (K x 1 column vector)
+#' @param diag.covar.error.matrix (BL: Omega)
+#'                                A diagonal covariance matrix of error terms from the expressed views
+#'                                 representing the uncertainty in each view ( K x K Matrix)
+#' @param view.vector (BL: Q) Vector including the Views (K x 1 column vector)
 #' @return cvar CVaR of the specific portfolio or asset with the set alpha
 #' @export
 BLPortfolioOptimizer = function(risk.aversion.coeff=3,
                                 tau=0.025,
                                 covar.matrix,
                                 market.cap.weights,
-                                ident.view.matrix,
-                                diag.covar.error.matrix,
-                                view.vector)
+                                ident.view.matrix = matrix(c(1,0,0,1,0,-1),ncol=3),
+                                diag.covar.error.matrix = matrix(c(0.95,0,0,0.5),ncol=2),
+                                view.vector = c(5,1)
+                                )
 {
 
-  # 1) Excess Market Returns
-  market.returns.vector <- risk.aversion.coeff %*% covar.matrix %*% market.cap.weights
+  # 1) Implied Excess Equilibrium Market Returns
+  implied.market.returns.vector <- risk.aversion.coeff %*% covar.matrix %*% market.cap.weights
 
-  print(paste("Market Returns:",market.returns.vector))
+  print(paste("Market Returns:",implied.market.returns.vector))
 
   # 2) Expected Returns
-  expected.returns.vector <- solve(solve(tau%*% covar.matrix)+t(ident.view.matrix) %*% solve(diag.covar.error.matrix)%*% ident.view.matrix)%*%
-                                   (solve(tau%*% covar.matrix) %*% market.returns.vector + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
+  expected.returns.vector <- solve(solve(tau%*% covar.matrix)+t(ident.view.matrix) %*% solve(diag.covar.error.matrix)%*% ident.view.matrix) %*%
+                                   (solve(tau%*% covar.matrix) %*% implied.market.returns.vector + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
 
 
   # 3) Uncertainty of Returns
 
-  uncert.returns.vector <-
+  uncert.returns.vector <-solve(solve(tau %*% covar.matrix) + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
+
+
+  # 4) New Covariance Matrix
+
+  new.covar.matrix <- covar.matrix + uncert.returns.vector
+
+  # 5) Final Weights
+
+  BL.weights <- solve(risk.aversion.coeff %*% new.covar.matrix) %*% implied.market.returns.vector
+
 
 }
 
