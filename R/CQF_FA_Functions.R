@@ -355,36 +355,53 @@ BLPortfolioOptimizer = function(risk.aversion.coeff=3,
                                 tau=0.025,
                                 covar.matrix,
                                 market.cap.weights,
-                                ident.view.matrix = matrix(c(1,0,0,1,0,-1),ncol=3),
-                                diag.covar.error.matrix = matrix(c(0.95,0,0,0.5),ncol=2),
-                                view.vector = c(5,1)
+                                ident.view.matrix,
+                                diag.covar.error.matrix,
+                                view.vector
                                 )
 {
 
-  # 1) Implied Excess Equilibrium Market Returns
-  implied.market.returns.vector <- risk.aversion.coeff %*% covar.matrix %*% market.cap.weights
+  Q <- view.vector # K x 1
+  P <- ident.view.matrix # K x N , check that each row sums to 0
 
-  print(paste("Market Returns:",implied.market.returns.vector))
+  Omega <- diag.covar.error.matrix # K x K
+
+  print(paste("Number of Views:",length(Q)))
+
+  if(all(rowSums(P)==0)==FALSE) {stop("Check your ident.view.matrix, rows do not sum to zero")}
+
+  if(nrow(P)!=length(Q)) {stop("Number of Rows in ident.view.matrix differ from Number of Views ")}
+
+  if(ncol(P)!=nrow(covar.matrix)) {stop("Number of Rows in ident.view.matrix differ from Number of Assets")}
+
+  if(nrow(Omega)!=length(Q) && ncol(Omega)!=length(Q)) {stop("diag.covar.error.matrix not K x K length")}
+
+
+
+  # 1) Implied Excess Equilibrium Market Returns
+  Pi <- risk.aversion.coeff * covar.matrix %*% market.cap.weights
+
+  print(paste(implied.market.returns.vector))
 
   # 2) Expected Returns
-  expected.returns.vector <- solve(solve(tau%*% covar.matrix)+t(ident.view.matrix) %*% solve(diag.covar.error.matrix)%*% ident.view.matrix) %*%
-                                   (solve(tau%*% covar.matrix) %*% implied.market.returns.vector + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
+  expected.returns.vector <- solve(solve(tau * covar.matrix) + t(P) %*% solve(Omega)%*% P) %*%
+                                  (solve(tau * covar.matrix) %*% Pi + t(P) %*% solve(Omega) %*% Q)
 
 
   # 3) Uncertainty of Returns
 
-  uncert.returns.vector <-solve(solve(tau %*% covar.matrix) + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
+  #uncert.returns.vector <-solve(solve(tau * covar.matrix) + t(ident.view.matrix) %*% solve(diag.covar.error.matrix) %*% view.vector)
 
 
   # 4) New Covariance Matrix
 
-  new.covar.matrix <- covar.matrix + uncert.returns.vector
+ # new.covar.matrix <- covar.matrix + uncert.returns.vector
 
   # 5) Final Weights
 
-  BL.weights <- solve(risk.aversion.coeff %*% new.covar.matrix) %*% implied.market.returns.vector
-
-
+  BL.weights <- solve(risk.aversion.coeff * covar.matrix) %*% expected.returns.vector
+sum(BL.weights)
+return(BL.weights)
 }
 
 
@@ -415,6 +432,10 @@ generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
                                             exp.return    = "sample",
                                             target.return = NA,
                                             alpha.cvar    = NA,
+                                            bl.market.cap.weights = NA,
+                                            bl.ident.view.matrix = NA,
+                                            bl.diag.covar.error.matrix = NA,
+                                            bl.view.vector = NA,
                                             in.sample     = FALSE) {
 
 first.out.of.sample.date <- lubridate::floor_date(min(daily.returns.data.wide$ref.date),"month")
@@ -494,6 +515,14 @@ for(i in 1:N.pf.rebalances) {
                      }else if(pf.opt.type == "cvar") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
                        weights.vector <- CVaRPortfolioOptimizer(daily.returns.data.wide = daily.returns.data.wide.out.of.sample, alpha.cvar = alpha.cvar)
+                     } else if(pf.opt.type == "bl") {
+                       weights.vector <- BLPortfolioOptimizer(risk.aversion.coeff=3,
+                                                              tau=0.025,
+                                                              covar.matrix,
+                                                              market.cap.weights = bl.market.cap.weights,
+                                                              ident.view.matrix = bl.ident.view.matrix,
+                                                              diag.covar.error.matrix = bl.diag.covar.error.matrix,
+                                                              view.vector = bl.view.vector)
                      }
 
   weights.result.table <- data.frame(start.out.of.sample = min(daily.returns.data.wide.out.of.sample$ref.date),
