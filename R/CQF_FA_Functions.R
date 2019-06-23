@@ -605,7 +605,12 @@ for(i in 1:N.pf.rebalances) {
                        # cvar
                        else if(pf.opt.type == "cvar") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-                       weights.vector <- CVaRPortfolioOptimizer(daily.returns.data.wide = daily.returns.data.wide.out.of.sample, alpha.cvar = alpha.cvar)
+                       weights.vector <- CVaRPortfolioOptimizer(daily.returns.data.wide = daily.returns.data.wide.out.of.sample,
+                                                                alpha.cvar = alpha.cvar,
+                                                                rmin = 0,
+                                                                wmin = min.single.weight,
+                                                                wmax = max.single.weight,
+                                                                weight.sum = sum.weight)
                        }
 
                        # bl
