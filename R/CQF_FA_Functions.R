@@ -273,7 +273,70 @@ meanVariancePortfolioOptimizer <- function(asset.name,
 }
 
 
+#' meanVariancePortfolioOptimizerQP
+#'
+#' @description Mean Variance Portfolio Optimizer using Quadratic Programming
+#' @param asset.name Name of assets available
+#' @param mu.vector vector with estimated returns of investment objects
+#' @param sigma.vector vector with the volatilities of the investment objects
+#' @param correl.matrix correlation matrix of the investment objects
+#' @param covar.matrx covariance matrix
+#' @param use.covar.matrix use covariance matrix directly or build it via sigma vector and the correlation matrix, default is FALSE
+#' @param target.return which return level is seeked (for which the variance is minimized)
+#' @param sum.weight default is 1
+#' @param min.single.weight default is -100
+#' @param max.single.weight default is +100
+#' @return weight.risky.assets a vector with the weights of the risky assets
+#' @examples
+#' weights.vector          <- c(0.7,0.3)
+#' daily.returns.data.wide <- data.frame(ref.date=c(Sys.Date()-2:0), asset1.ret=c(-0.02,0.005,0.004), asset2.ret=c(0,-0.001,0.02))
+#' PFstats(weights.vector=weights.vector, daily.returns.data.wide=daily.returns.data.wide)
+#' @export
+meanVariancePortfolioOptimizerQP <- function(
+                                           mu.vector,
+                                           sigma.vector=NA,
+                                           correl.matrix=NA,
+                                           covar.matrix=NA,
+                                           use.covar.matrix=FALSE,
+                                           target.return,
+                                           sum.weight = 1,
+                                           min.single.weight =-100,
+                                           max.single.weight = 100,
+                                           mvp = FALSE
 
+                                           ) {
+
+  covar.matrix <- if(use.covar.matrix==FALSE) {
+    S          <- diag(sigma.vector)
+    R          <- correl.matrix
+    SRS        <- S %*% R %*% S
+    SRS
+  } else {covar.matrix}
+
+
+
+
+  if(mvp==FALSE) {
+  Dmat    <- covar.matrix
+  dvec    <- mu.vector
+  A.equal <- matrix(rep(sum.weight,length(mu.vector)), ncol=1)
+  Amat    <- cbind(A.equal, dvec, diag(length(mu.vector)), -diag(length(mu.vector)))
+  bvec    <- c(sum.weight, target.return, rep(min.single.weight, length(mu.vector)), rep(-max.single.weight, length(mu.vector)))
+
+  weight.solution <- quadprog::solve.QP(Dmat, dvec, Amat, bvec, meq=1)
+  optimal.weights <- weight.solution$solution
+  } else {
+    Dmat    <- covar.matrix
+    dvec    <- rep(0,nrow(covar.matrix))
+    A.equal <- matrix(rep(sum.weight,length(mu.vector)), ncol=1)
+    Amat <- cbind(A.equal, dvec, diag(length(mu.vector)), -diag(length(mu.vector)))
+    bvec    <- c(sum.weight, 0, rep(min.single.weight, length(mu.vector)), rep(-max.single.weight, length(mu.vector)))
+
+    weight.solution <- solve.QP(Dmat=covar.matrix,dvec=rep(0,nrow(covar.matrix)),Amat,bvec,meq=1)
+    optimal.weights <- weight.solution$solution
+}
+return(optimal.weights)
+}
 
 #' histCVaRcalc
 #'
@@ -299,13 +362,13 @@ histCVaRcalc = function(asset.weights=1, daily.returns.data.wide, alpha.cvar){
 
 #' CVaRPortfolioOptimizer
 #'
-#' @description CVaR Portfolio Optimizer
+#' @description CVaR Portfolio Optimizer based on Yollin (2009)
 #' @param daily.returns.data.wide data.frame including the daily returns of the specific assets as well as a reference date
 #' @param alpha Alpha of the CVaR, this is the confidence level from which on the average of the tail risk is being calculated
-#' @param rmin
-#' @param wmin
-#' @param wmax
-#' @param weight.sum
+#' @param rmin Required return, default is 0
+#' @param wmin Minimal weight of a single asset, default is 0
+#' @param wmax Maximal weight of a single asset, default is 1
+#' @param weight.sum Total weight of all assets, default is 1
 #' @return cvar CVaR of the specific portfolio or asset with the set alpha
 #' @export
 CVaRPortfolioOptimizer = function(daily.returns.data.wide, alpha.cvar=0.05, rmin=0, wmin=0, wmax=1, weight.sum=1)
@@ -419,24 +482,31 @@ return(BL.weights)
 #' @param target.return default is NA
 #' @param alpha.cvar Alpha parameter for CVaR optimization only, default is NA
 #' @param in.sample default is FALSE
+#' @param sum.weight default is 1
+#' @param min.single.weight default is -100
+#' @param max.single.weight default is +100
 #'
 #' @return list with result data.frames: weights.result.table,
 #' @export
 generateOptimizationResultStats <- function(out.of.sample.period.months = 24,
                                             investment.period.months    = 12,
                                             daily.returns.data.wide,
-                                            pf.opt.type   = "mpt.min.var",
-                                            covar.type    = "sample",
-                                            correl.type     = "sample",
-                                            vola.type     = "sample",
-                                            exp.return    = "sample",
-                                            target.return = NA,
-                                            alpha.cvar    = NA,
-                                            bl.market.cap.weights = NA,
-                                            bl.ident.view.matrix = NA,
-                                            bl.diag.covar.error.matrix = NA,
-                                            bl.view.vector = NA,
-                                            in.sample     = FALSE) {
+                                            pf.opt.type                 = "mpt.min.var",
+                                            use.covar.matrix            = FALSE,
+                                            covar.type                  = "sample",
+                                            correl.type                 = "sample",
+                                            vola.type                   = "sample",
+                                            exp.return                  = "sample",
+                                            target.return               = NA,
+                                            sum.weight                  = 1,
+                                            min.single.weight           = -100,
+                                            max.single.weight           = 100,
+                                            alpha.cvar                  = NA,
+                                            bl.market.cap.weights       = NA,
+                                            bl.ident.view.matrix        = NA,
+                                            bl.diag.covar.error.matrix  = NA,
+                                            bl.view.vector              = NA,
+                                            in.sample                   = FALSE) {
 
 first.out.of.sample.date <- lubridate::floor_date(min(daily.returns.data.wide$ref.date),"month")
 #last.out.of.sample.date  <- lubridate::ceiling_date(max(daily.returns.data.wide$ref.date)  %m-% months(out.of.sample.period.months),"month")
@@ -497,25 +567,49 @@ for(i in 1:N.pf.rebalances) {
 
   ## 2) RUN OPTIMIZATION AND GET WEIGHTS
 
-                    # 1/N
+                     # 1/N
   weights.vector <- if(pf.opt.type=="1/N") {
                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
                       weights.vector <- rep(1/length(asset.name),length(asset.name))
                       print(weights.vector)
+
                       # mpt.min.var
                     } else if(pf.opt.type == "mpt.min.var") {
                       print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-                      weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix, covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="min.var")$optimal.weights
-                      weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
-                     # mpt.tar.ret
+                      weights.vector <- meanVariancePortfolioOptimizerQP(mu.vector         = mu.vector,
+                                                                         sigma.vector      = sigma.vector,
+                                                                         correl.matrix     = correl.matrix,
+                                                                         covar.matrix      = covar.matrix,
+                                                                         use.covar.matrix  = use.covar.matrix,
+                                                                         target.return     = target.return,
+                                                                         sum.weight        = sum.weight,
+                                                                         min.single.weight = min.single.weight,
+                                                                         max.single.weight = max.single.weight,
+                                                                         mvp               = TRUE)
+
+                      # mpt.tar.ret
                      } else if(pf.opt.type == "mpt.tar.ret") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
-                       weights.vector <- meanVariancePortfolioOptimizer(asset.name, mu.vector, sigma.vector, correl.matrix,covar.matrix, use.covar.matrix=TRUE, target.return, rf=0, opt.focus.type="return")$optimal.weights
-                       weights.vector <- weights.vector[2:length(weights.vector)] # first value is for risk free, which is here ignored for the min variance pf
-                     }else if(pf.opt.type == "cvar") {
+                       weights.vector <- meanVariancePortfolioOptimizerQP(mu.vector         = mu.vector,
+                                                                          sigma.vector      = sigma.vector,
+                                                                          correl.matrix     = correl.matrix,
+                                                                          covar.matrix      = covar.matrix,
+                                                                          use.covar.matrix  = use.covar.matrix,
+                                                                          target.return     = target.return,
+                                                                          sum.weight        = sum.weight,
+                                                                          min.single.weight = min.single.weight,
+                                                                          max.single.weight = max.single.weight,
+                                                                          mvp               = FALSE)
+                       }
+
+                       # cvar
+                       else if(pf.opt.type == "cvar") {
                        print(paste("OPTIMIZATION TYPE:",pf.opt.type))
                        weights.vector <- CVaRPortfolioOptimizer(daily.returns.data.wide = daily.returns.data.wide.out.of.sample, alpha.cvar = alpha.cvar)
-                     } else if(pf.opt.type == "bl") {
+                       }
+
+                       # bl
+                        else if(pf.opt.type == "bl") {
                        weights.vector <- BLPortfolioOptimizer(risk.aversion.coeff=3,
                                                               tau=0.025,
                                                               covar.matrix,
