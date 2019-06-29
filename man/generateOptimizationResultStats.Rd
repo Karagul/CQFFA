@@ -6,9 +6,13 @@
 \usage{
 generateOptimizationResultStats(out.of.sample.period.months = 24,
   investment.period.months = 12, daily.returns.data.wide,
-  pf.opt.type = "mpt.min.var", covar.type = "sample",
-  correl.type = "sample", vola.type = "sample",
-  exp.return = "sample", target.return = NA, alpha.cvar = NA,
+  pf.opt.type = "mpt.min.var", use.covar.matrix = FALSE,
+  covar.type = "sample", correl.type = "sample",
+  vola.type = "sample", exp.return = "sample", target.return = NA,
+  sum.weight = 1, min.single.weight = -100, max.single.weight = 100,
+  alpha.cvar = NA, bl.risk.aversion.coeff = 3.07, bl.tau = 0.025,
+  bl.market.cap.weights = NA, bl.ident.view.matrix = NA,
+  bl.diag.covar.error.matrix = NA, bl.view.vector = NA,
   in.sample = FALSE)
 }
 \arguments{
@@ -29,6 +33,12 @@ generateOptimizationResultStats(out.of.sample.period.months = 24,
 \item{exp.return}{expected return of the assets, default is sample - meaning that we take historical asset return as a best predictor}
 
 \item{target.return}{default is NA}
+
+\item{sum.weight}{default is 1}
+
+\item{min.single.weight}{default is -100}
+
+\item{max.single.weight}{default is +100}
 
 \item{alpha.cvar}{Alpha parameter for CVaR optimization only, default is NA}
 

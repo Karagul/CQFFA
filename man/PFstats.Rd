@@ -5,7 +5,8 @@
 \title{PFstats}
 \usage{
 PFstats(weights.vector, daily.returns.data.wide,
-  num.trade.days.per.year = 250)
+  num.trade.days.per.year = 250, long.term.mean.return = 0,
+  long.term.sd.return = 0.01)
 }
 \arguments{
 \item{weights.vector}{vector that contains the relative weights of the individual assets of the portfolio}
